@@ -309,6 +309,21 @@ struct check_initial_state_v<State, InitialStates<InitialState...>> {
   static constexpr bool value = ((State == InitialState) ||...);
 };
 
+// Check whether the pointer to member function is to an r-value qualified
+// function. For example:
+// class MyClass {
+//   void l_value() const;
+//   void r_value() &&;
+// };
+// is_pointer_to_r_value_member_function<&MyClass::l_value> -> false
+// is_pointer_to_r_value_member_function<&MyClass::r_value> -> true
+template<class T>
+struct is_pointer_to_r_value_member_function : std::false_type {};
+
+template<class R, class T, class... Args>
+struct is_pointer_to_r_value_member_function<R (T::*)(Args...) &&>
+  : std::true_type {};
+
 // Generic wrapper: it's the class that checks the validity of the transitions,
 // and calls the functions.
 template<
@@ -354,7 +369,11 @@ class GenericWrapper {
   auto call_final_state(Args&&... args) &&
     -> return_of_final_state<FinalStates, CurrentState, FunctionPointer,
                              Wrapped, Args...> {
-    return (wrapped_.*FunctionPointer)(std::forward<Args>(args)...);
+    static_assert(is_pointer_to_r_value_member_function<
+                      decltype(FunctionPointer)>::value,
+                  "Final state functions should consume the object: "
+                  "add && after the argument list.");
+    return (std::move(wrapped_).*FunctionPointer)(std::forward<Args>(args)...);
   }
 
   // Check that the query is valid, then call the function and return the

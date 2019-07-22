@@ -81,7 +81,7 @@ class HTTPConnectionStarter {
 
   // Start the connection. This should consume the object.
   HTTPConnection
-  start() {
+  start() && {
     return HTTPConnection(std::move(headers_), std::move(body_));
   }
 
