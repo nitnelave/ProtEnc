@@ -301,6 +301,7 @@ using return_of_valid_query =
             Args...>
         ::type;
 
+// Check that the given state is in the list of initial states.
 template <auto State, typename InitialStates>
 struct check_initial_state_v {
   static_assert(std::is_same_v<InitialStates, std::false_type>,
@@ -327,6 +328,23 @@ template<class R, class T, class... Args>
 struct is_pointer_to_r_value_member_function<R (T::*)(Args...) &&>
   : std::true_type {};
 
+// Check that the types used to define the initial states, transitions and so
+// on are correct.
+template <template <typename...> typename ListType, typename Value>
+struct is_correct_list_type : std::false_type {};
+
+template <template <typename...> typename ListType, typename... Elements>
+struct is_correct_list_type<ListType, ListType<Elements...>> : std::true_type {};
+
+template <template <auto...> typename ListType, typename ValueType,
+          typename Value>
+struct is_correct_value_list_type : std::false_type {};
+
+template <template <auto...> typename ListType,  typename ValueType,
+          ValueType... Elements>
+struct is_correct_value_list_type<ListType, ValueType, ListType<Elements...>>
+  : std::true_type {};
+
 // Generic wrapper: it's the class that checks the validity of the transitions,
 // and calls the functions.
 template<
@@ -348,6 +366,23 @@ template<
          typename ValidQueries
         >
 class GenericWrapper {
+  static_assert(is_correct_value_list_type<::prot_enc::InitialStates,
+                                           decltype(CurrentState),
+                                           InitialStates>::value,
+                "The list of initial states should be all of the correct type, "
+                "and contained in a prot_enc::InitialStates type.");
+  static_assert(is_correct_list_type<::prot_enc::Transitions, Transitions>
+                  ::value,
+                "The list of transitions should be contained in a "
+                "prot_enc::Transitions type");
+  static_assert(is_correct_list_type<::prot_enc::FinalStates, FinalStates>
+                  ::value,
+                "The list of final states should be contained in a "
+                "prot_enc::FinalStates type");
+  static_assert(is_correct_list_type<::prot_enc::ValidQueries, ValidQueries>
+                  ::value,
+                "The list of query methods should be contained in a "
+                "prot_enc::ValidQueries type");
  public:
 
   // Alias to this class, with a different state.
