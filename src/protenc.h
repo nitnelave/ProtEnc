@@ -111,6 +111,9 @@ struct ValidQueries;
     WRAPPER_TYPE(Base&& other) : Base(other) {}                                \
    public:                                                                     \
     WRAPPER_TYPE() : Base(Wrapped{}) {}                                        \
+    /* Disallow copy constructor. */                                           \
+    WRAPPER_TYPE(const WRAPPER_TYPE&) = delete;                                \
+    WRAPPER_TYPE& operator=(const WRAPPER_TYPE&) = delete;                     \
     PROTENC_MACRO_END
 
 
