@@ -20,7 +20,7 @@
 // If we turn that into a FSM, we get:
 //
 //  *******               *********             ******
-//  *START* ---header---> *HEADERS* ---body---> *BODY* -->start<--
+//  *START* ---header---> *HEADERS* ---body---> *BODY* -->build<--
 //  *******               *********             ******
 //                         |    ^
 //                         |    |
@@ -30,7 +30,7 @@
 // us to the state "HEADERS". There, we have a choice: we can keep adding
 // headers as many times as we want, always looping back to the same state, or
 // we can add a body, getting us to the state "BODY". From there, we just have
-// to call "start", which is the final transition into an accepting state.
+// to call "build", which is the final transition into an accepting state.
 //
 // The setup consists of:
 //   - An enum to list the states.
@@ -55,14 +55,14 @@ enum class HTTPStarterState {
 };
 
 // Forward-declaration of the wrapper, to make it a friend of
-// HTTPConnectionStarter. That way, we can hide the constructor of
-// HTTPConnectionStarter, preventing users from creating an unwrapped
-// HTTPConnectionStarter.
+// HTTPConnectionBuilder. That way, we can hide the constructor of
+// HTTPConnectionBuilder, preventing users from creating an unwrapped
+// HTTPConnectionBuilder.
 template <HTTPStarterState>
-class HTTPConnectionStarterWrapper;
+class HTTPConnectionBuilderWrapper;
 
 // Basic implementation of the class, without the protocol constraints.
-class HTTPConnectionStarter {
+class HTTPConnectionBuilder {
  public:
 
   void add_header(std::string header) {
@@ -81,18 +81,18 @@ class HTTPConnectionStarter {
 
   // Start the connection. This should consume the object.
   HTTPConnection
-  start() && {
+  build() && {
     return HTTPConnection(std::move(headers_), std::move(body_));
   }
 
  private:
   // Constructor is private, only the wrapper gets to build one, so that
   // no one builds a connection starter not wrapped.
-  HTTPConnectionStarter() = default;
+  HTTPConnectionBuilder() = default;
 
   // Only the wrapper has access to the class, to build it.
   template <HTTPStarterState>
-  friend class ::HTTPConnectionStarterWrapper;
+  friend class ::HTTPConnectionBuilderWrapper;
 
   // Internal fields.
   std::vector<std::string> headers_;
@@ -119,28 +119,28 @@ using MyInitialStates = InitialStates<HTTPStarterState::START>;
 using MyTransitions = Transitions<
       // We can go from START to HEADERS by calling add_header.
       Transition<HTTPStarterState::START, HTTPStarterState::HEADERS,
-                 &HTTPConnectionStarter::add_header>,
+                 &HTTPConnectionBuilder::add_header>,
       // This is the loop: we stay in the state HEADERS.
       Transition<HTTPStarterState::HEADERS, HTTPStarterState::HEADERS,
-                 &HTTPConnectionStarter::add_header>,
+                 &HTTPConnectionBuilder::add_header>,
       Transition<HTTPStarterState::HEADERS, HTTPStarterState::BODY,
-                 &HTTPConnectionStarter::add_body>
+                 &HTTPConnectionBuilder::add_body>
   >;
 
 // Accepting states, of the form <accepting state, end function pointer>.
 using MyFinalStates = FinalStates<
-   FinalState<HTTPStarterState::BODY, &HTTPConnectionStarter::start>
+   FinalState<HTTPStarterState::BODY, &HTTPConnectionBuilder::build>
   >;
 
 // Valid information queries, of the form <accepting state, end function
 // pointer>.
 using MyValidQueries = ValidQueries<
    // We can only call num_headers from the state BODY.
-   ValidQuery<HTTPStarterState::BODY, &HTTPConnectionStarter::num_headers>
+   ValidQuery<HTTPStarterState::BODY, &HTTPConnectionBuilder::num_headers>
   >;
 
 // This is the declaration of the wrapper: it is a class declaration.
-PROTENC_START_WRAPPER(HTTPConnectionStarterWrapper, HTTPConnectionStarter,
+PROTENC_START_WRAPPER(HTTPConnectionBuilderWrapper, HTTPConnectionBuilder,
                       HTTPStarterState, MyInitialStates, MyTransitions,
                       MyFinalStates, MyValidQueries);
 
@@ -150,7 +150,7 @@ PROTENC_START_WRAPPER(HTTPConnectionStarterWrapper, HTTPConnectionStarter,
   PROTENC_DECLARE_TRANSITION(add_body);
 
   // End functions.
-  PROTENC_DECLARE_FINAL_STATE(start);
+  PROTENC_DECLARE_FINAL_STATE(build);
 
   // Query functions.
   PROTENC_DECLARE_QUERY_METHOD(num_headers);
@@ -159,8 +159,8 @@ PROTENC_END_WRAPPER;
 
 // Factory method. Note that trying to build a wrapper in any other state than
 // START (because it's in our initial state list) will fail.
-static HTTPConnectionStarterWrapper<HTTPStarterState::START>
-GetConnectionStarter() {
+static HTTPConnectionBuilderWrapper<HTTPStarterState::START>
+GetConnectionBuilder() {
   return {};
 }
 
@@ -168,30 +168,30 @@ int main() {
     // Get the connection with an easy interface.
     // The order of the functions is checked at compile-time by the state
     // markers.
-    HTTPConnection connection_1 = GetConnectionStarter()
+    HTTPConnection connection_1 = GetConnectionBuilder()
                                   .add_header("First header")
                                   .add_header("Second header")
                                   .add_body("Body")
-                                  .start();
+                                  .build();
 
     // Print the body of the connection, just to check that we succeeded.
     std::cout << std::get<1>(connection_1) << '\n';
 
     // The query is only valid once we have the body.
-    auto connection_part = GetConnectionStarter()
+    auto connection_part = GetConnectionBuilder()
                            .add_header("First header")
                            .add_body("Body");
     std::cout << "Num headers: " << connection_part.num_headers() << '\n';
     // We have to move the connection_part, because all the operations consume
     // the object and return a new one.
-    auto connection_2 = std::move(connection_part).start();
+    auto connection_2 = std::move(connection_part).build();
 
     // This doesn't compile:
-    // GetConnectionStarter().add_body("Body");
-    // GetConnectionStarter().add_header("First header")
+    // GetConnectionBuilder().add_body("Body");
+    // GetConnectionBuilder().add_header("First header")
     //                       .add_body("Body")
     //                       .add_header("Second header");
-    // GetConnectionStarter().add_header("Header").start();
+    // GetConnectionBuilder().add_header("Header").build();
 
     return 0;
 }
