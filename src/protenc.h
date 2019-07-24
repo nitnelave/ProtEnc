@@ -283,7 +283,7 @@ struct return_of_valid_query_t{
   struct ValidQuery;
   struct Found;
   static_assert(std::is_same<ValidQuery, Found>::value,
-                "Final state not found");
+                "Valid query not found");
 };
 
 // Found a valid query. Needs the arguments for result_of.
