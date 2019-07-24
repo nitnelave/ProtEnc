@@ -1,0 +1,13 @@
+strict digraph {
+    rankdir="LR"
+
+    _start_ [color="#FFFFFF" fontcolor="#FFFFFF"]
+    _end_  [color="#FFFFFF" fontcolor="#FFFFFF"]
+
+    _start_ -> START
+    START -> HEADERS [label="add_header"]
+    HEADERS -> HEADERS [label="add_header"]
+    HEADERS -> BODY [label="add_body"]
+    BODY -> _end_ [label="build"]
+}
+
