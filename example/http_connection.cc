@@ -45,7 +45,7 @@ using HTTPConnection = std::tuple<std::vector<std::string>, std::string>;
 
 
 // List of states in our FSM.
-enum class HTTPStarterState {
+enum class HTTPBuilderState {
   // Empty class.
   START,
   // Added at least one header.
@@ -58,7 +58,7 @@ enum class HTTPStarterState {
 // HTTPConnectionBuilder. That way, we can hide the constructor of
 // HTTPConnectionBuilder, preventing users from creating an unwrapped
 // HTTPConnectionBuilder.
-template <HTTPStarterState>
+template <HTTPBuilderState>
 class HTTPConnectionBuilderWrapper;
 
 // Basic implementation of the class, without the protocol constraints.
@@ -91,7 +91,7 @@ class HTTPConnectionBuilder {
   HTTPConnectionBuilder() = default;
 
   // Only the wrapper has access to the class, to build it.
-  template <HTTPStarterState>
+  template <HTTPBuilderState>
   friend class ::HTTPConnectionBuilderWrapper;
 
   // Internal fields.
@@ -113,35 +113,35 @@ using prot_enc::InitialStates;
 // parameters containing commas.
 
 // Initial states (can be a list).
-using MyInitialStates = InitialStates<HTTPStarterState::START>;
+using MyInitialStates = InitialStates<HTTPBuilderState::START>;
 
 // Transitions, of the form <starting state, end state, function pointer>.
 using MyTransitions = Transitions<
       // We can go from START to HEADERS by calling add_header.
-      Transition<HTTPStarterState::START, HTTPStarterState::HEADERS,
+      Transition<HTTPBuilderState::START, HTTPBuilderState::HEADERS,
                  &HTTPConnectionBuilder::add_header>,
       // This is the loop: we stay in the state HEADERS.
-      Transition<HTTPStarterState::HEADERS, HTTPStarterState::HEADERS,
+      Transition<HTTPBuilderState::HEADERS, HTTPBuilderState::HEADERS,
                  &HTTPConnectionBuilder::add_header>,
-      Transition<HTTPStarterState::HEADERS, HTTPStarterState::BODY,
+      Transition<HTTPBuilderState::HEADERS, HTTPBuilderState::BODY,
                  &HTTPConnectionBuilder::add_body>
   >;
 
 // Accepting states, of the form <accepting state, end function pointer>.
 using MyFinalStates = FinalStates<
-   FinalState<HTTPStarterState::BODY, &HTTPConnectionBuilder::build>
+   FinalState<HTTPBuilderState::BODY, &HTTPConnectionBuilder::build>
   >;
 
 // Valid information queries, of the form <accepting state, end function
 // pointer>.
 using MyValidQueries = ValidQueries<
    // We can only call num_headers from the state BODY.
-   ValidQuery<HTTPStarterState::BODY, &HTTPConnectionBuilder::num_headers>
+   ValidQuery<HTTPBuilderState::BODY, &HTTPConnectionBuilder::num_headers>
   >;
 
 // This is the declaration of the wrapper: it is a class declaration.
 PROTENC_START_WRAPPER(HTTPConnectionBuilderWrapper, HTTPConnectionBuilder,
-                      HTTPStarterState, MyInitialStates, MyTransitions,
+                      HTTPBuilderState, MyInitialStates, MyTransitions,
                       MyFinalStates, MyValidQueries);
 
   // Declare the list of functions that we are wrapping:
@@ -159,7 +159,7 @@ PROTENC_END_WRAPPER;
 
 // Factory method. Note that trying to build a wrapper in any other state than
 // START (because it's in our initial state list) will fail.
-static HTTPConnectionBuilderWrapper<HTTPStarterState::START>
+static HTTPConnectionBuilderWrapper<HTTPBuilderState::START>
 GetConnectionBuilder() {
   return {};
 }
