@@ -151,13 +151,13 @@ struct ValidQueries;
  ******************************************************************************/
 namespace internal {
 
+struct NotFound{};
+
 // Get the target state of a transition, if it exists (for this starting state
 // and function pointer).
 template <auto CurrentState, auto FunctionPointer, typename... Transitions>
 struct find_transition_t {
-  struct Transition;
-  struct Found;
-  static_assert(std::is_same<Transition, Found>::value, "Transition not found");
+  using type = NotFound;
 };
 
 // Found the transition.
@@ -233,9 +233,7 @@ using find_transition =
 // and function pointer).
 template <typename T>
 struct return_of_transition_t {
-  struct Transition;
-  struct Found;
-  static_assert(std::is_same<Transition, Found>::value, "Transition not found");
+  static_assert(!std::is_same_v<T, NotFound>, "Transition not found");
 };
 
 // The transition is a transition (and not a final state or query function).
@@ -255,10 +253,7 @@ constexpr auto return_of_transition =
 // declared for this state and function pointer).
 template <typename T, typename... Args>
 struct return_of_final_state_t{
-  struct FinalState;
-  struct Found;
-  static_assert(std::is_same<FinalState, Found>::value,
-                "Final state not found");
+  static_assert(!std::is_same_v<T, NotFound>, "Final state not found");
 };
 
 // Found the final state. Needs the arguments for result_of.
@@ -280,10 +275,7 @@ using return_of_final_state =
 // declared for this state and function pointer).
 template <typename T, typename... Args>
 struct return_of_valid_query_t{
-  struct ValidQuery;
-  struct Found;
-  static_assert(std::is_same<ValidQuery, Found>::value,
-                "Valid query not found");
+  static_assert(!std::is_same_v<T, NotFound>, "Valid query not found");
 };
 
 // Found a valid query. Needs the arguments for result_of.
