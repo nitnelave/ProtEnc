@@ -154,6 +154,9 @@ HTTPConnection connection =
       .build();
 ```
 
+The full code of this example is in
+[example/http_connection.cc](https://github.com/nitnelave/ProtEnc/blob/master/example/http_connection.cc).
+
 ## What can this library be used for?
 
 Any protocol that can be represented by a FSM can be encoded using this
