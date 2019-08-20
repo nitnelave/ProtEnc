@@ -27,7 +27,7 @@ namespace prot_enc {
 template <auto StartState, auto EndState, auto FunctionPointer>
 struct Transition;
 template <auto StartState, auto FunctionPointer>
-struct FinalState;
+struct FinalTransition;
 template <auto StartState, auto FunctionPointer>
 struct ValidQuery;
 
@@ -37,8 +37,8 @@ struct InitialStates;
 template <typename... Transition>
 struct Transitions;
 
-template <typename... FinalState>
-struct FinalStates;
+template <typename... FinalTransition>
+struct FinalTransitions;
 
 template <typename... ValidQuery>
 struct ValidQueries;
@@ -53,7 +53,7 @@ struct ValidQueries;
 // START_WRAPPER_DECL(args...);
 //   DECLARE_TRANSITION(function_name);
 //   DECLARE_TRANSITION(function_name2);
-//   DECLARE_FINAL_STATE(function_name3);
+//   DECLARE_FINAL_TRANSITION(function_name3);
 //   DECLARE_QUERY_METHOD(function_name4);
 //   ...
 // END_WRAPPER_DECL;
@@ -74,10 +74,10 @@ struct ValidQueries;
 //                   &WRAPPED_TYPE::my_function>,
 //        ...
 //      >"
-//   - FINAL_STATES: The type containing the valid end states. It should be of
-//     the form:
-//     "FinalStates<
-//          FinalState<start_state, &WRAPPED_TYPE::function_name>,
+//   - FINAL_TRANSITIONS: The type containing the valid end states. It should
+//     be of the form:
+//     "FinalTransitions<
+//          FinalTransition<start_state, &WRAPPED_TYPE::function_name>,
 //          ...
 //      >"
 //   - VALID_QUERIES: The type containing the valid query functions. It should
@@ -88,19 +88,19 @@ struct ValidQueries;
 //      >"
 
 #define PROTENC_START_WRAPPER(WRAPPER_TYPE, WRAPPED_TYPE, STATE_TYPE,          \
-                              INITIAL_STATES, TRANSITIONS, FINAL_STATES,       \
+                              INITIAL_STATES, TRANSITIONS, FINAL_TRANSITIONS,  \
                               VALID_QUERIES)                                   \
   template<STATE_TYPE CurrentState>                                            \
   class WRAPPER_TYPE                                                           \
     : public ::prot_enc::internal::GenericWrapper<                             \
           CurrentState, WRAPPER_TYPE, WRAPPED_TYPE, INITIAL_STATES,            \
-          TRANSITIONS, FINAL_STATES, VALID_QUERIES>                            \
+          TRANSITIONS, FINAL_TRANSITIONS, VALID_QUERIES>                       \
   {                                                                            \
    public:                                                                     \
     using Base =                                                               \
         ::prot_enc::internal::GenericWrapper<                                  \
             CurrentState, WRAPPER_TYPE,  WRAPPED_TYPE, INITIAL_STATES,         \
-            TRANSITIONS, FINAL_STATES, VALID_QUERIES>;                         \
+            TRANSITIONS, FINAL_TRANSITIONS, VALID_QUERIES>;                    \
     using Wrapped = WRAPPED_TYPE;                                              \
    private:                                                                    \
     /* Allow the GenericWrapper to construct an instance of this with a */     \
@@ -126,12 +126,12 @@ struct ValidQueries;
     } PROTENC_MACRO_END
 
 
-#define PROTENC_DECLARE_FINAL_STATE(name)                      \
-    template <typename... Args>                                \
-    auto name(Args&&... args) && {                             \
-      return std::move(*this)                                  \
-          .template call_final_state<&Wrapped::name, Args...>( \
-              std::forward<Args>(args)...);                    \
+#define PROTENC_DECLARE_FINAL_TRANSITION(name)                      \
+    template <typename... Args>                                     \
+    auto name(Args&&... args) && {                                  \
+      return std::move(*this)                                       \
+          .template call_final_transition<&Wrapped::name, Args...>( \
+              std::forward<Args>(args)...);                         \
     } PROTENC_MACRO_END
 
 #define PROTENC_DECLARE_QUERY_METHOD(name)                             \
@@ -173,9 +173,9 @@ struct find_transition_t<CurrentState, FunctionPointer,
 // Found the end state.
 template <auto CurrentState, auto FunctionPointer, typename... Transitions>
 struct find_transition_t<CurrentState, FunctionPointer,
-                         FinalState<CurrentState, FunctionPointer>,
+                         FinalTransition<CurrentState, FunctionPointer>,
                          Transitions...> {
-  using type = FinalState<CurrentState, FunctionPointer>;
+  using type = FinalTransition<CurrentState, FunctionPointer>;
 };
 
 // Found the valid query.
@@ -195,12 +195,12 @@ struct find_transition_t<CurrentState, FunctionPointer, Transition,
                                           Transitions...>::type;
 };
 
-// Unwrap FinalStates.
-template <auto CurrentState, auto FunctionPointer, typename... FinalState>
+// Unwrap FinalTransitions.
+template <auto CurrentState, auto FunctionPointer, typename... FinalTransition>
 struct find_transition_t<CurrentState, FunctionPointer,
-                         FinalStates<FinalState...>> {
+                         FinalTransitions<FinalTransition...>> {
   using type = typename find_transition_t<CurrentState, FunctionPointer,
-                                          FinalState...>::type;
+                                          FinalTransition...>::type;
 };
 
 // Unwrap Transitions.
@@ -221,7 +221,7 @@ struct find_transition_t<CurrentState, FunctionPointer,
 };
 
 // Find the transition (if any) starting from CurrentState, with label
-// FunctionPointer. This can return either a Transition, a FinalState or a
+// FunctionPointer. This can return either a Transition, a FinalTransition or a
 // ValidQuery.
 template <auto CurrentState, auto FunctionPointer, typename... Transitions>
 using find_transition =
@@ -236,7 +236,8 @@ struct return_of_transition_t {
   static_assert(!std::is_same_v<T, NotFound>, "Transition not found");
 };
 
-// The transition is a transition (and not a final state or query function).
+// The transition is a transition (and not a final transition or query
+// function).
 template <auto TransitionEnd, auto CurrentState, auto FunctionPointer>
 struct return_of_transition_t<Transition<CurrentState, TransitionEnd,
                               FunctionPointer>> {
@@ -252,22 +253,23 @@ constexpr auto return_of_transition =
 // Get the result of an end function, if it is valid (i.e. we have an end state
 // declared for this state and function pointer).
 template <typename T, typename... Args>
-struct return_of_final_state_t{
-  static_assert(!std::is_same_v<T, NotFound>, "Final state not found");
+struct return_of_final_transition_t{
+  static_assert(!std::is_same_v<T, NotFound>, "Final transition not found");
 };
 
-// Found the final state. Needs the arguments for result_of.
+// Found the final transition. Needs the arguments for result_of.
 template <auto CurrentState, auto FunctionPointer, typename... Args>
-struct return_of_final_state_t<FinalState<CurrentState, FunctionPointer>,
+struct return_of_final_transition_t<FinalTransition<CurrentState, FunctionPointer>,
                                Args...> {
   using type = std::result_of_t<decltype(FunctionPointer)(Args...)>;
 };
 
-template <typename FinalStates, auto CurrentState, auto FunctionPointer,
+template <typename FinalTransitions, auto CurrentState, auto FunctionPointer,
           typename... Args>
-using return_of_final_state =
-    typename return_of_final_state_t<find_transition<CurrentState,
-                                     FunctionPointer, FinalStates>, Args...>
+using return_of_final_transition =
+    typename return_of_final_transition_t<
+        find_transition<CurrentState, FunctionPointer, FinalTransitions>,
+        Args...>
         ::type;
 
 
@@ -353,7 +355,7 @@ template<
          // The list of valid transitions. See PROTENC_START_WRAPPER.
          typename Transitions,
          // The list of valid end states. See PROTENC_START_WRAPPER.
-         typename FinalStates,
+         typename FinalTransitions,
          // The list of valid query function. See PROTENC_START_WRAPPER.
          typename ValidQueries
         >
@@ -367,10 +369,11 @@ class GenericWrapper {
                   ::value,
                 "The list of transitions should be contained in a "
                 "prot_enc::Transitions type");
-  static_assert(is_correct_list_type<::prot_enc::FinalStates, FinalStates>
+  static_assert(is_correct_list_type<::prot_enc::FinalTransitions,
+                                     FinalTransitions>
                   ::value,
-                "The list of final states should be contained in a "
-                "prot_enc::FinalStates type");
+                "The list of final transitions should be contained in a "
+                "prot_enc::FinalTransitions type");
   static_assert(is_correct_list_type<::prot_enc::ValidQueries, ValidQueries>
                   ::value,
                 "The list of query methods should be contained in a "
@@ -380,7 +383,8 @@ class GenericWrapper {
   // Alias to this class, with a different state.
   template <auto NewState>
   using ThisWrapper = GenericWrapper<NewState, Wrapper, Wrapped, InitialStates,
-                                     Transitions, FinalStates, ValidQueries>;
+                                     Transitions, FinalTransitions,
+                                     ValidQueries>;
 
   // Check that the transition is valid, then call the function, and return the
   // wrapper with the updated state.
@@ -393,15 +397,15 @@ class GenericWrapper {
                 ThisWrapper<target_state>{std::move(wrapped_), true});
     }
 
-  // Check that the final state is valid, then call the function and return the
-  // result.
+  // Check that the final transiton is valid, then call the function and return
+  // the result.
   template <auto FunctionPointer, typename... Args>
-  auto call_final_state(Args&&... args) &&
-    -> return_of_final_state<FinalStates, CurrentState, FunctionPointer,
-                             Wrapped, Args...> {
+  auto call_final_transition(Args&&... args) &&
+    -> return_of_final_transition<FinalTransitions, CurrentState,
+                                  FunctionPointer, Wrapped, Args...> {
     static_assert(is_pointer_to_r_value_member_function<
                       decltype(FunctionPointer)>::value,
-                  "Final state functions should consume the object: "
+                  "Final transition functions should consume the object: "
                   "add && after the argument list.");
     return (std::move(wrapped_).*FunctionPointer)(std::forward<Args>(args)...);
   }

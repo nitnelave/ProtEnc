@@ -34,8 +34,8 @@
 //
 // The setup consists of:
 //   - An enum to list the states.
-//   - The types describing our state machine (initial states, final states,
-//     transitions, ...).
+//   - The types describing our state machine (initial states, final
+//     transitions, transitions, ...).
 //   - The implementation of the builder, unconstrained.
 //   - The wrapper class, which will do the constraining.
 
@@ -101,14 +101,14 @@ class HTTPConnectionBuilder {
 
 using prot_enc::Transitions;
 using prot_enc::Transition;
-using prot_enc::FinalStates;
-using prot_enc::FinalState;
+using prot_enc::FinalTransitions;
+using prot_enc::FinalTransition;
 using prot_enc::ValidQueries;
 using prot_enc::ValidQuery;
 using prot_enc::InitialStates;
 
 // Definition of the graph, from the initial states, transitions and final
-// states.
+// transitions.
 // The use of aliases allows us to get around the limitations of macros with
 // parameters containing commas.
 
@@ -128,8 +128,8 @@ using MyTransitions = Transitions<
   >;
 
 // Accepting states, of the form <accepting state, end function pointer>.
-using MyFinalStates = FinalStates<
-   FinalState<HTTPBuilderState::BODY, &HTTPConnectionBuilder::build>
+using MyFinalTransitions = FinalTransitions<
+   FinalTransition<HTTPBuilderState::BODY, &HTTPConnectionBuilder::build>
   >;
 
 // Valid information queries, of the form <accepting state, end function
@@ -142,7 +142,7 @@ using MyValidQueries = ValidQueries<
 // This is the declaration of the wrapper: it is a class declaration.
 PROTENC_START_WRAPPER(HTTPConnectionBuilderWrapper, HTTPConnectionBuilder,
                       HTTPBuilderState, MyInitialStates, MyTransitions,
-                      MyFinalStates, MyValidQueries);
+                      MyFinalTransitions, MyValidQueries);
 
   // Declare the list of functions that we are wrapping:
   // Transitions
@@ -150,7 +150,7 @@ PROTENC_START_WRAPPER(HTTPConnectionBuilderWrapper, HTTPConnectionBuilder,
   PROTENC_DECLARE_TRANSITION(add_body);
 
   // End functions.
-  PROTENC_DECLARE_FINAL_STATE(build);
+  PROTENC_DECLARE_FINAL_TRANSITION(build);
 
   // Query functions.
   PROTENC_DECLARE_QUERY_METHOD(num_headers);

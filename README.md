@@ -84,8 +84,8 @@ Similarly, we can declare that we can finish only from the BODY state, by
 calling the `build` function:
 
 ```c++
-using MyFinalStates = FinalStates<
-    FinalState<HTTPBuilderState::BODY, &HTTPConnectionBuilder::build>
+using MyFinalTransitions = FinalTransitions<
+    FinalTransition<HTTPBuilderState::BODY, &HTTPConnectionBuilder::build>
   >;
 ```
 
@@ -127,8 +127,8 @@ PROTENC_START_WRAPPER(
     MyInitialStates,
     // Transitions
     MyTransitions,
-    // Final states
-    MyFinalStates,
+    // Final transitions
+    MyFinalTransitions,
     // List of valid query methods (const methods on the implementation)
     MyValidQueries);
 
@@ -138,7 +138,7 @@ PROTENC_START_WRAPPER(
   PROTENC_DECLARE_TRANSITION(add_body);
 
   // End functions.
-  PROTENC_DECLARE_FINAL_STATE(build);
+  PROTENC_DECLARE_FINAL_TRANSITION(build);
 
 PROTENC_END_WRAPPER;
 ```
@@ -178,7 +178,7 @@ Oh, you want to get into the details? TL;DR: lots of template magic :)
 
 The wrapper object is templated by the enum representing the states. The value
 of the template parameter is the state in which the wrapper is. Every
-transition method (including the final state methods) consume the object
+transition method (including the final transition methods) consume the object
 (taking it by r-value reference), and return a new wrapper in the new state.
 The underlying object is never copied (provided it has a good move
 constructor).
@@ -197,7 +197,7 @@ and friends) to the `GenericWrapper`.
     pointer, checks that it's a valid transition, and returns the new state.
   - It has a bunch of checks to make sure that we have "pretty" error messages
     for common errors (not using the correct types to define the FSM, not
-    consuming the object for a final state transition, etc).
+    consuming the object for a final transition, etc).
 
 ### `call_transition`
 
@@ -209,8 +209,9 @@ error. If the transition is found, we can extract from it the target state. We
 then call the function on the wrapped object, and return a new wrapper
 (constructed by moving the current wrapper) in the new state.
 
-The other functions (`call_final_state`, `call_valid_query`) work in a similar
-fashion, deducing the return type from the function pointer and the arguments.
+The other functions (`call_final_transition`, `call_valid_query`) work in a
+similar fashion, deducing the return type from the function pointer and the
+arguments.
 
 The GenericWrapper constructor checks that it was built with one of the initial
 states (with a `static_assert`).
@@ -239,10 +240,10 @@ the code itself.
     the same origin and label, or that there are no unreachable states. I feel
     that this is more the responsability of the user: they need to make sure the
     FSM is the right one for their protocol.
-  - We check the top-level list parameters (`Transitions`, `FinalStates`, ...)
-    but we could go down and check that the function pointers are from the
-    wrapped class, that the types are `Transition`/`FinalState`/..., that the
-    states are from the right enum, and so on.
+  - We check the top-level list parameters (`Transitions`, `FinalTransitions`,
+    ...) but we could go down and check that the function pointers are from the
+    wrapped class, that the types are `Transition`/`FinalTransition`/..., that
+    the states are from the right enum, and so on.
 - **Better error messages.** When the transition is not found, we have static
   information about the state and the function pointer, so it should
   theoretically be possible to craft an error message with more information
